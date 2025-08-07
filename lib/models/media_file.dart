@@ -61,6 +61,7 @@ class MediaFile {
       case '.ogg':
       case '.m4a':
       case '.aac':
+      case '.opus':
         return MediaType.audio;
       case '.pdf':
       case '.doc':

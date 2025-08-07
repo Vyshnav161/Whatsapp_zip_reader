@@ -1,4 +1,4 @@
-package com.wolfex161.wzipchat
+package com.vyratechnology.wzipchat
 
 import io.flutter.embedding.android.FlutterActivity
 
