@@ -123,9 +123,22 @@ class ChatMessage {
       const currentUserName = 'You'; // Placeholder, replace with actual logic
       final isMe = sender == currentUserName;
       
+      // Process the content to replace specific patterns
+      String processedContent = content;
+      
+      // Replace 'null' with 'Call Connected'
+      if (processedContent == 'null') {
+        processedContent = 'Call Connected';
+      }
+      
+      // Replace '<Media omitted>' with 'Media Not Downloaded'
+      if (processedContent == '<Media omitted>') {
+        processedContent = 'Media Not Downloaded';
+      }
+      
       return ChatMessage(
         sender: sender,
-        content: content,
+        content: processedContent,
         timestamp: timestamp,
         isMe: isMe,
       );
