@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../models/media_file.dart';
 import '../utils/theme_utils.dart';
 
@@ -16,13 +17,19 @@ class MediaItem extends StatefulWidget {
 
 class _MediaItemState extends State<MediaItem> {
   VideoPlayerController? _videoController;
-  bool _isInitialized = false;
+  AudioPlayer? _audioPlayer;
+  bool _isVideoInitialized = false;
+  bool _isPlayingAudio = false;
+  Duration _audioDuration = Duration.zero;
+  Duration _audioPosition = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     if (widget.mediaFile.type == MediaType.video) {
       _initializeVideoPlayer();
+    } else if (widget.mediaFile.type == MediaType.audio) {
+      _initializeAudioPlayer();
     }
   }
 
@@ -32,14 +39,82 @@ class _MediaItemState extends State<MediaItem> {
     
     if (mounted) {
       setState(() {
-        _isInitialized = true;
+        _isVideoInitialized = true;
       });
     }
+  }
+  
+  Future<void> _initializeAudioPlayer() async {
+    _audioPlayer = AudioPlayer();
+    
+    // Set the audio file
+    await _audioPlayer!.setSourceDeviceFile(widget.mediaFile.file.path);
+    
+    // Get the duration
+    final duration = await _audioPlayer!.getDuration() ?? Duration.zero;
+    
+    // Listen to position changes
+    _audioPlayer!.onPositionChanged.listen((position) {
+      if (mounted) {
+        setState(() {
+          _audioPosition = position;
+        });
+      }
+    });
+    
+    // Listen to player state changes
+    _audioPlayer!.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _isPlayingAudio = false;
+          _audioPosition = Duration.zero;
+        });
+      }
+    });
+    
+    if (mounted) {
+      setState(() {
+        _audioDuration = duration;
+      });
+    }
+  }
+  
+  Future<void> _toggleAudioPlayback() async {
+    if (_isPlayingAudio) {
+      await _audioPlayer!.pause();
+    } else {
+      await _audioPlayer!.resume();
+      
+      // If we're at the end, restart from beginning
+      if (_audioPosition >= _audioDuration) {
+        await _audioPlayer!.seek(Duration.zero);
+      }
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isPlayingAudio = !_isPlayingAudio;
+      });
+    }
+  }
+  
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits(duration.inHours);
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    
+    return [
+      if (duration.inHours > 0) hours,
+      minutes,
+      seconds,
+    ].join(':');
   }
 
   @override
   void dispose() {
     _videoController?.dispose();
+    _audioPlayer?.dispose();
     super.dispose();
   }
 
@@ -91,14 +166,14 @@ class _MediaItemState extends State<MediaItem> {
                 ],
               ),
               body: Center(
-                child: _videoController != null && _isInitialized
+                child: _videoController != null && _isVideoInitialized
                     ? AspectRatio(
                         aspectRatio: _videoController!.value.aspectRatio,
                         child: VideoPlayer(_videoController!),
                       )
                     : CircularProgressIndicator(),
               ),
-              floatingActionButton: _videoController != null && _isInitialized
+              floatingActionButton: _videoController != null && _isVideoInitialized
                   ? FloatingActionButton(
                       onPressed: () {
                         setState(() {
@@ -397,13 +472,13 @@ class _MediaItemState extends State<MediaItem> {
             return Container(
               height: 150,
               color: Colors.grey[300],
-              child: Icon(Icons.broken_image, size: 50, color: Colors.grey[600]),
+              child: const Icon(Icons.broken_image, size: 50, color: Colors.grey),
             );
           },
         );
         
       case MediaType.video:
-        if (_isInitialized && _videoController != null) {
+        if (_isVideoInitialized && _videoController != null) {
           return Stack(
             alignment: Alignment.center,
             children: [
@@ -437,8 +512,79 @@ class _MediaItemState extends State<MediaItem> {
       case MediaType.audio:
         return Container(
           height: 100,
-          color: Colors.blue[100],
-          child: Center(child: Icon(Icons.audiotrack, size: 50, color: WhatsAppTheme.primaryColor)),
+          color: Colors.blue[50],
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Audio info
+              Row(
+                children: [
+                  // Play/Pause button
+                  IconButton(
+                    icon: Icon(
+                      _isPlayingAudio ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                      size: 40,
+                      color: WhatsAppTheme.primaryColor,
+                    ),
+                    onPressed: _toggleAudioPlayback,
+                  ),
+                  SizedBox(width: 16),
+                  // File name
+                  Expanded(
+                    child: Text(
+                      widget.mediaFile.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              // Progress bar
+              if (_audioDuration.inSeconds > 0)
+                Column(
+                  children: [
+                    SizedBox(height: 8),
+                    // Progress indicator
+                    LinearProgressIndicator(
+                      value: _audioDuration.inSeconds > 0 
+                          ? _audioPosition.inSeconds / _audioDuration.inSeconds 
+                          : 0,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        WhatsAppTheme.primaryColor.withOpacity(0.7),
+                      ),
+                      minHeight: 3,
+                    ),
+                    SizedBox(height: 4),
+                    // Time indicators
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(_audioPosition),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          _formatDuration(_audioDuration),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+            ],
+          ),
         );
         
       case MediaType.document:

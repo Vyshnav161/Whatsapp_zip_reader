@@ -54,6 +54,9 @@ dependencies:
   # Video player for media preview
   video_player: ^2.8.2
   
+  # Audio player for audio preview
+  audioplayers: ^5.2.1
+  
   # SVG support
   flutter_svg: ^2.0.10+1
   

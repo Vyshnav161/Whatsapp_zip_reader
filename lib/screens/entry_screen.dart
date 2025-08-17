@@ -79,11 +79,6 @@ class _EntryScreenState extends State<EntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('WhatsApp ZIP Viewer'),
-        backgroundColor: WhatsAppTheme.appBarColor,
-        foregroundColor: Colors.white,
-      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
