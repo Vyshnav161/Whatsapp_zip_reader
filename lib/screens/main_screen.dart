@@ -303,7 +303,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
            date1.day == date2.day;
   }
   
-  // Close search and clear filters
+  // Close search mode
   void _closeSearch() {
     setState(() {
       _isSearching = false;

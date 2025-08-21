@@ -3,12 +3,14 @@ class ChatMessage {
   final String content;
   final DateTime timestamp;
   final bool isMe; // To determine if the message is from the current user
+  String? linkedMediaName; // Name of linked media file if mentioned in message
 
   ChatMessage({
     required this.sender,
     required this.content,
     required this.timestamp,
     required this.isMe,
+    this.linkedMediaName,
   });
 
   // Factory method to parse a line from the chat export file
@@ -125,6 +127,7 @@ class ChatMessage {
       
       // Process the content to replace specific patterns
       String processedContent = content;
+      String? mediaFileName;
       
       // Replace 'null' with 'Call Connected'
       if (processedContent == 'null') {
@@ -136,11 +139,19 @@ class ChatMessage {
         processedContent = 'Media Not Downloaded';
       }
       
+      // Check if the message mentions a media file
+      final RegExp mediaPattern = RegExp(r'([\w\-]+\.(jpg|jpeg|png|gif|mp4|mp3|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|wav|ogg|m4a|aac|opus|avi|mkv|webm|webp|bmp))', caseSensitive: false);
+      final match = mediaPattern.firstMatch(processedContent);
+      if (match != null) {
+        mediaFileName = match.group(0);
+      }
+      
       return ChatMessage(
         sender: sender,
         content: processedContent,
         timestamp: timestamp,
         isMe: isMe,
+        linkedMediaName: mediaFileName,
       );
     } catch (e) {
       // Return a default message for invalid lines

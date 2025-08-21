@@ -129,6 +129,19 @@ class WhatsappZipProvider with ChangeNotifier {
     }
   }
 
+  // Add this method to the WhatsappZipProvider class
+  
+  // Find media file by name
+  MediaFile? findMediaByName(String name) {
+    try {
+      return _mediaFiles.firstWhere(
+        (media) => media.name.toLowerCase() == name.toLowerCase()
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+  
   // Process chat export file
   Future<void> _processChatFile(File file) async {
     try {
@@ -219,7 +232,9 @@ class WhatsappZipProvider with ChangeNotifier {
     } else {
       _filteredChatMessages = _chatMessages.where((message) {
         return message.content.toLowerCase().contains(_searchQuery) ||
-               message.sender.toLowerCase().contains(_searchQuery);
+               message.sender.toLowerCase().contains(_searchQuery) ||
+               (message.linkedMediaName != null && 
+                message.linkedMediaName!.toLowerCase().contains(_searchQuery));
       }).toList();
     }
     
