@@ -1,6 +1,6 @@
 import 'dart:core';
 
-enum LinkType { webUrl, pdfFile, documentFile, imageFile, videoFile }
+enum LinkType { webUrl }
 
 class DetectedLink {
   final String text;
@@ -36,56 +36,49 @@ class DetectedLink {
   }
 }
 
-/// A utility class for detecting and classifying different types of links in text.
+/// A utility class for detecting and classifying web URLs in text.
 /// 
 /// This class provides functionality to:
-/// - Detect web URLs, PDF files, and document files in text
-/// - Classify links by type for appropriate handling
+/// - Detect web URLs in text
 /// - Format URLs for launching in external applications
-/// - Validate link formats
+/// - Validate URL formats
 /// 
-/// The detection is optimized for performance with compiled regex patterns
-/// and efficient overlap detection algorithms.
+/// The detection is optimized for performance with compiled regex patterns.
 class LinkDetector {
-  // Enhanced web URL regex pattern - compiled once for performance
+  // Web URL regex pattern - only matches actual web URLs, not file names
   static final RegExp _webUrlRegExp = RegExp(
-    r'(https?://(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?://(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[a-zA-Z]{2,}(?:/[^\s]*)?)',
+    r'(https?://[^\s]+|www\.[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:/[^\s]*)?)',
     caseSensitive: false,
   );
 
-  // PDF file regex pattern - compiled once for performance
-  static final RegExp _pdfRegExp = RegExp(
-    r'((?:https?://[^\s]*\.pdf(?:\?[^\s]*)?)|(?:www\.[^\s]*\.pdf(?:\?[^\s]*)?)|(?:[a-zA-Z]:\\[^\s]*\.pdf)|(?:~/[^\s]*\.pdf)|(?:/[^\s]*\.pdf)|(?:\b[^\s]*\.pdf\b))',
-    caseSensitive: false,
-  );
 
-  // Document file regex pattern - compiled once for performance
-  static final RegExp _documentRegExp = RegExp(
-    r'((?:https?://[^\s]*\.(?:docx|doc|txt|rtf)(?:\?[^\s]*)?)|(?:www\.[^\s]*\.(?:docx|doc|txt|rtf)(?:\?[^\s]*)?)|(?:[a-zA-Z]:\\[^\s]*\.(?:docx|doc|txt|rtf))|(?:~/[^\s]*\.(?:docx|doc|txt|rtf))|(?:/[^\s]*\.(?:docx|doc|txt|rtf))|(?:\b[^\s]*\.(?:docx|doc|txt|rtf)\b))',
-    caseSensitive: false,
-  );
 
-  // Image file regex pattern - compiled once for performance
-  static final RegExp _imageRegExp = RegExp(
-    r'((?:https?://[^\s]*\.(?:jpg|jpeg|png|gif|bmp|webp|svg)(?:\?[^\s]*)?)|(?:www\.[^\s]*\.(?:jpg|jpeg|png|gif|bmp|webp|svg)(?:\?[^\s]*)?)|(?:[a-zA-Z]:\\[^\s]*\.(?:jpg|jpeg|png|gif|bmp|webp|svg))|(?:~/[^\s]*\.(?:jpg|jpeg|png|gif|bmp|webp|svg))|(?:/[^\s]*\.(?:jpg|jpeg|png|gif|bmp|webp|svg))|(?:\b[^\s]*\.(?:jpg|jpeg|png|gif|bmp|webp|svg)\b))',
-    caseSensitive: false,
-  );
 
-  // Video file regex pattern - compiled once for performance
-  static final RegExp _videoRegExp = RegExp(
-    r'((?:https?://[^\s]*\.(?:mp4|avi|mov|wmv|flv|webm|mkv|m4v)(?:\?[^\s]*)?)|(?:www\.[^\s]*\.(?:mp4|avi|mov|wmv|flv|webm|mkv|m4v)(?:\?[^\s]*)?)|(?:[a-zA-Z]:\\[^\s]*\.(?:mp4|avi|mov|wmv|flv|webm|mkv|m4v))|(?:~/[^\s]*\.(?:mp4|avi|mov|wmv|flv|webm|mkv|m4v))|(?:/[^\s]*\.(?:mp4|avi|mov|wmv|flv|webm|mkv|m4v))|(?:\b[^\s]*\.(?:mp4|avi|mov|wmv|flv|webm|mkv|m4v)\b))',
-    caseSensitive: false,
-  );
 
   // Cache for recently processed texts to improve performance
   static final Map<String, List<DetectedLink>> _cache = {};
   static const int _maxCacheSize = 100;
 
-  /// Detects all links in the given text and returns them as a list of DetectedLink objects.
+  // Common file extensions that should never be treated as web URLs
+  static final Set<String> _fileExtensions = {
+    // Audio files
+    'mp3', 'wav', 'flac', 'aac', 'ogg', 'opus', 'm4a', 'wma',
+    // Video files  
+    'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v',
+    // Image files
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff',
+    // Document files
+    'pdf', 'doc', 'docx', 'txt', 'rtf', 'xls', 'xlsx', 'ppt', 'pptx',
+    // Archive files
+    'zip', 'rar', '7z', 'tar', 'gz',
+    // Other common files
+    'exe', 'dmg', 'pkg', 'deb', 'rpm'
+  };
+
+  /// Detects all web URLs in the given text and returns them as a list of DetectedLink objects.
   /// 
   /// This method uses caching to improve performance for repeated text processing.
-  /// The detection prioritizes more specific patterns (PDF, documents) over general web URLs
-  /// to avoid false positives.
+  /// Excludes matches that appear to be file names based on common file extensions.
   /// 
   /// Returns an empty list if no links are found.
   static List<DetectedLink> detectLinks(String text) {
@@ -101,66 +94,21 @@ class LinkDetector {
 
     final List<DetectedLink> links = [];
 
-    // Detect image files first (most specific pattern)
-    for (final match in _imageRegExp.allMatches(text)) {
+    // Detect web URLs
+    for (final match in _webUrlRegExp.allMatches(text)) {
+      final matchText = match.group(0)!;
+      
+      // Skip if this looks like a file name with a common file extension
+      if (_isLikelyFileName(matchText)) {
+        continue;
+      }
+      
       links.add(DetectedLink(
-        text: match.group(0)!,
-        type: LinkType.imageFile,
+        text: matchText,
+        type: LinkType.webUrl,
         start: match.start,
         end: match.end,
       ));
-    }
-
-    // Detect video files
-    for (final match in _videoRegExp.allMatches(text)) {
-      // Check if this match overlaps with any existing image link
-      if (!_overlapsWithExistingLinks(links, match.start, match.end)) {
-        links.add(DetectedLink(
-          text: match.group(0)!,
-          type: LinkType.videoFile,
-          start: match.start,
-          end: match.end,
-        ));
-      }
-    }
-
-    // Detect PDF files
-    for (final match in _pdfRegExp.allMatches(text)) {
-      // Check if this match overlaps with any existing media link
-      if (!_overlapsWithExistingLinks(links, match.start, match.end)) {
-        links.add(DetectedLink(
-          text: match.group(0)!,
-          type: LinkType.pdfFile,
-          start: match.start,
-          end: match.end,
-        ));
-      }
-    }
-
-    // Detect document files
-    for (final match in _documentRegExp.allMatches(text)) {
-      // Check if this match overlaps with any existing link
-      if (!_overlapsWithExistingLinks(links, match.start, match.end)) {
-        links.add(DetectedLink(
-          text: match.group(0)!,
-          type: LinkType.documentFile,
-          start: match.start,
-          end: match.end,
-        ));
-      }
-    }
-
-    // Detect web URLs (least specific, so done last)
-    for (final match in _webUrlRegExp.allMatches(text)) {
-      // Check if this match overlaps with any existing link
-      if (!_overlapsWithExistingLinks(links, match.start, match.end)) {
-        links.add(DetectedLink(
-          text: match.group(0)!,
-          type: LinkType.webUrl,
-          start: match.start,
-          end: match.end,
-        ));
-      }
     }
 
     // Sort links by their start position for consistent ordering
@@ -172,67 +120,58 @@ class LinkDetector {
     return links;
   }
 
-  /// Classifies a single link string and returns its type
-  static LinkType classifyLink(String link) {
-    if (_pdfRegExp.hasMatch(link)) return LinkType.pdfFile;
-    if (_documentRegExp.hasMatch(link)) return LinkType.documentFile;
-    return LinkType.webUrl;
-  }
-
-  /// Checks if a given range overlaps with any existing detected links
-  static bool _overlapsWithExistingLinks(List<DetectedLink> existingLinks, int start, int end) {
-    for (final link in existingLinks) {
-      if ((start >= link.start && start < link.end) ||
-          (end > link.start && end <= link.end) ||
-          (start <= link.start && end >= link.end)) {
+  /// Checks if a matched string is likely a file name rather than a web URL
+  static bool _isLikelyFileName(String text) {
+    // Remove protocol if present for checking
+    String checkText = text.toLowerCase();
+    if (checkText.startsWith('http://') || checkText.startsWith('https://')) {
+      return false; // Has protocol, likely a real URL
+    }
+    if (checkText.startsWith('www.')) {
+      return false; // Starts with www, likely a real URL
+    }
+    
+    // Check if it ends with a common file extension
+    final lastDotIndex = checkText.lastIndexOf('.');
+    if (lastDotIndex != -1 && lastDotIndex < checkText.length - 1) {
+      final extension = checkText.substring(lastDotIndex + 1);
+      // Remove any trailing path or query parameters
+      final cleanExtension = extension.split('/')[0].split('?')[0];
+      if (_fileExtensions.contains(cleanExtension)) {
         return true;
       }
     }
+    
     return false;
   }
+
+  /// Classifies a single link string and returns its type
+  static LinkType classifyLink(String link) {
+    return LinkType.webUrl;
+  }
+
+
 
   /// Formats a URL for launching by adding protocol if needed
   static String formatUrlForLaunching(String url, LinkType type) {
     // Clean up the URL first
     String cleanUrl = url.trim();
     
-    switch (type) {
-      case LinkType.webUrl:
-        // Handle various URL formats
-        if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
-          return cleanUrl;
-        } else if (cleanUrl.startsWith('www.')) {
-          return 'https://$cleanUrl';
-        } else if (cleanUrl.contains('.') && !cleanUrl.startsWith('/')) {
-          // Looks like a domain, add https://
-          return 'https://$cleanUrl';
-        }
-        return cleanUrl;
-      case LinkType.pdfFile:
-      case LinkType.documentFile:
-        // For file URLs, check if they need protocol
-        if (cleanUrl.startsWith('www.')) {
-          return 'https://$cleanUrl';
-        } else if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
-          return cleanUrl;
-        } else if (cleanUrl.contains('.') && !cleanUrl.startsWith('/') && !cleanUrl.contains('\\')) {
-          // Looks like a web URL for a file
-          return 'https://$cleanUrl';
-        }
-        return cleanUrl;
+    // Handle various URL formats
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+      return cleanUrl;
+    } else if (cleanUrl.startsWith('www.')) {
+      return 'https://$cleanUrl';
+    } else if (cleanUrl.contains('.') && !cleanUrl.startsWith('/')) {
+      // Looks like a domain, add https://
+      return 'https://$cleanUrl';
     }
+    return cleanUrl;
   }
 
   /// Validates if a link appears to be well-formed
   static bool isValidLink(String link, LinkType type) {
-    switch (type) {
-      case LinkType.webUrl:
-        return _webUrlRegExp.hasMatch(link);
-      case LinkType.pdfFile:
-        return _pdfRegExp.hasMatch(link);
-      case LinkType.documentFile:
-        return _documentRegExp.hasMatch(link);
-    }
+    return _webUrlRegExp.hasMatch(link);
   }
 
   /// Caches the detection result with size management

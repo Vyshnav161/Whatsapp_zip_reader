@@ -117,89 +117,27 @@ class ChatMessageBubble extends StatelessWidget {
     );
   }
 
-  /// Builds a clickable link span with appropriate icon and styling based on link type.
+  /// Builds a clickable link span for web URLs.
   /// 
-  /// For file types (PDF, documents), includes an icon before the text.
   /// Web URLs are displayed without icons for cleaner appearance.
   InlineSpan _buildLinkSpan(DetectedLink link, BuildContext context) {
-    final List<InlineSpan> linkSpans = [];
-
-    // Add icon for file types
-    if (link.type != LinkType.webUrl) {
-      linkSpans.add(
-        WidgetSpan(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 4.0),
-            child: Icon(
-              _getLinkIcon(link.type),
-              size: 14,
-              color: _getLinkColor(link.type),
-            ),
-          ),
-          alignment: PlaceholderAlignment.middle,
-        ),
-      );
-    }
-
-    // Add the link text
-    linkSpans.add(
-      TextSpan(
-        text: link.text,
-        style: TextStyle(
-          color: _getLinkColor(link.type),
-          fontSize: 15,
-          decoration: TextDecoration.underline,
-          fontWeight: link.type != LinkType.webUrl ? FontWeight.w500 : FontWeight.normal,
-        ),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () => _handleLinkTap(link, context),
+    return TextSpan(
+      text: link.text,
+      style: TextStyle(
+        color: Colors.blue,
+        fontSize: 15,
+        decoration: TextDecoration.underline,
       ),
+      recognizer: TapGestureRecognizer()
+        ..onTap = () => _handleLinkTap(link, context),
     );
-
-    return TextSpan(children: linkSpans);
   }
 
-  /// Returns the appropriate Material Icon for the given link type.
-  IconData _getLinkIcon(LinkType type) {
-    switch (type) {
-      case LinkType.pdfFile:
-        return Icons.picture_as_pdf;
-      case LinkType.documentFile:
-        return Icons.description;
-      case LinkType.webUrl:
-        return Icons.link; // Not used for web URLs
-    }
-  }
 
-  /// Returns the appropriate color for the given link type.
-  /// 
-  /// - Web URLs: Blue (standard link color)
-  /// - PDF files: Red (to indicate document type)
-  /// - Document files: Green (to differentiate from PDFs)
-  Color _getLinkColor(LinkType type) {
-    switch (type) {
-      case LinkType.webUrl:
-        return Colors.blue;
-      case LinkType.pdfFile:
-        return Colors.red.shade600;
-      case LinkType.documentFile:
-        return Colors.green.shade600;
-    }
-  }
 
-  /// Handles link tap events by routing to the appropriate launch method based on link type.
+  /// Handles link tap events for web URLs.
   void _handleLinkTap(DetectedLink link, BuildContext context) async {
-    switch (link.type) {
-      case LinkType.webUrl:
-        await _launchWebUrl(link.text, context);
-        break;
-      case LinkType.pdfFile:
-        await _launchPdfFile(link.text, context);
-        break;
-      case LinkType.documentFile:
-        await _launchDocumentFile(link.text, context);
-        break;
-    }
+    await _launchWebUrl(link.text, context);
   }
 
   /// Launches a web URL in the device's default external browser.
@@ -227,47 +165,9 @@ class ChatMessageBubble extends StatelessWidget {
     }
   }
 
-  /// Launches a PDF file in the device's default PDF viewer application.
-  /// 
-  /// Supports both local file paths and remote URLs.
-  /// Shows user-friendly error message if launch fails.
-  Future<void> _launchPdfFile(String filePath, BuildContext context) async {
-    try {
-      final String formattedUrl = LinkDetector.formatUrlForLaunching(filePath, LinkType.pdfFile);
-      final Uri uri = Uri.parse(formattedUrl);
-      
-      print('Attempting to launch PDF: $formattedUrl');
-      
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      
-      print('PDF launch successful');
-      
-    } catch (e) {
-      print('PDF launch failed: $e');
-      _showLaunchError('PDF file', 'Unable to open PDF. Error: ${e.toString()}', context);
-    }
-  }
 
-  /// Launches a document file in the appropriate default application.
-  /// 
-  /// Supports .doc, .docx, .txt, and .rtf files.
-  /// Shows user-friendly error message if launch fails.
-  Future<void> _launchDocumentFile(String filePath, BuildContext context) async {
-    try {
-      final String formattedUrl = LinkDetector.formatUrlForLaunching(filePath, LinkType.documentFile);
-      final Uri uri = Uri.parse(formattedUrl);
-      
-      print('Attempting to launch document: $formattedUrl');
-      
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      
-      print('Document launch successful');
-      
-    } catch (e) {
-      print('Document launch failed: $e');
-      _showLaunchError('document file', 'Unable to open document. Error: ${e.toString()}', context);
-    }
-  }
+
+
 
   /// Shows a user-friendly error message when link launching fails.
   /// 
