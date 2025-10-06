@@ -50,7 +50,7 @@ class ChatMessageBubble extends StatelessWidget {
     return colors[hashCode.abs() % colors.length];
   }
 
-  // Helper method to make URLs and files clickable
+  // Helper method to make URLs and files clickable and handle edited messages
   // Optimized for performance with early returns and efficient text processing
   Widget _buildClickableText(String text, BuildContext context) {
     // Early return for empty text
@@ -58,31 +58,55 @@ class ChatMessageBubble extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // Detect all links in the text
-    final List<DetectedLink> links = LinkDetector.detectLinks(text);
+    // Check if message contains edited indicator
+    final bool isEdited = text.contains('<This message was edited>');
+    final String cleanText = isEdited ? text.replaceAll('<This message was edited>', '').trim() : text;
 
+    // Detect all links in the clean text
+    final List<DetectedLink> links = LinkDetector.detectLinks(cleanText);
+
+    Widget textWidget;
+    
     // If no links found, return simple text widget (more efficient than RichText)
     if (links.isEmpty) {
-      return Text(
-        text,
+      textWidget = Text(
+        cleanText,
         style: TextStyle(
           color: WhatsAppTheme.primaryTextColor,
           fontSize: 15,
         ),
         softWrap: true,
       );
-    }
+    } else {
+      // Build text spans with clickable links
+      final List<InlineSpan> spans = <InlineSpan>[];
+      int lastEnd = 0;
 
-    // Build text spans with clickable links
-    final List<InlineSpan> spans = <InlineSpan>[];
-    int lastEnd = 0;
+      for (final link in links) {
+        // Add text before the link
+        if (link.start > lastEnd) {
+          spans.add(
+            TextSpan(
+              text: cleanText.substring(lastEnd, link.start),
+              style: TextStyle(
+                color: WhatsAppTheme.primaryTextColor,
+                fontSize: 15,
+              ),
+            ),
+          );
+        }
 
-    for (final link in links) {
-      // Add text before the link
-      if (link.start > lastEnd) {
+        // Add the clickable link
+        spans.add(_buildLinkSpan(link, context));
+
+        lastEnd = link.end;
+      }
+
+      // Add any remaining text after the last link
+      if (lastEnd < cleanText.length) {
         spans.add(
           TextSpan(
-            text: text.substring(lastEnd, link.start),
+            text: cleanText.substring(lastEnd),
             style: TextStyle(
               color: WhatsAppTheme.primaryTextColor,
               fontSize: 15,
@@ -91,30 +115,52 @@ class ChatMessageBubble extends StatelessWidget {
         );
       }
 
-      // Add the clickable link
-      spans.add(_buildLinkSpan(link, context));
-
-      lastEnd = link.end;
-    }
-
-    // Add any remaining text after the last link
-    if (lastEnd < text.length) {
-      spans.add(
-        TextSpan(
-          text: text.substring(lastEnd),
-          style: TextStyle(
-            color: WhatsAppTheme.primaryTextColor,
-            fontSize: 15,
-          ),
-        ),
+      textWidget = RichText(
+        text: TextSpan(children: spans),
+        softWrap: true,
+        overflow: TextOverflow.visible,
       );
     }
 
-    return RichText(
-      text: TextSpan(children: spans),
-      softWrap: true,
-      overflow: TextOverflow.visible,
-    );
+    // If message was edited, add the edited indicator
+    if (isEdited) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (cleanText.isNotEmpty) textWidget,
+          if (cleanText.isNotEmpty) const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade500,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.info,
+                  size: 10,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'edited',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: WhatsAppTheme.secondaryTextColor,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return textWidget;
   }
 
   /// Builds a clickable link span for web URLs.

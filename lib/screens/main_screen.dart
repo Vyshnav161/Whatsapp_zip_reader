@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
 import '../providers/whatsapp_zip_provider.dart';
 import '../utils/theme_utils.dart';
+import '../utils/pdf_service.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../widgets/media_item.dart';
 import 'entry_screen.dart';
@@ -21,6 +23,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   bool _showScrollToTop = false;
   bool _showScrollToBottom = false;
   bool _isSearching = false;
+  bool _isDownloading = false;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -61,7 +64,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Are you sure?'),
-        content: const Text('The files will be deleted'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -134,7 +136,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             },
           ),
           actions: [
-            if (!_isSearching)
+            if (!_isSearching) ...[
               IconButton(
                 icon: const Icon(Icons.search),
                 onPressed: () {
@@ -143,6 +145,20 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   });
                 },
               ),
+              IconButton(
+                icon: _isDownloading 
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.download),
+                onPressed: _isDownloading ? null : _downloadChatAsPdf,
+              ),
+            ],
           ],
           bottom: TabBar(
             controller: _tabController,
@@ -356,5 +372,112 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+  
+  // Download chat as PDF
+  Future<void> _downloadChatAsPdf() async {
+    final provider = Provider.of<WhatsappZipProvider>(context, listen: false);
+    final chatMessages = provider.chatMessages;
+    
+    if (chatMessages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No chat messages to download'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Download Chat as PDF'),
+        content: Text('Download ${chatMessages.length} messages as PDF?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Download'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    setState(() {
+      _isDownloading = true;
+    });
+    
+    try {
+      final filePath = await PdfService.generateChatPdf(chatMessages);
+      
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+        });
+        
+        // Show success dialog with path and open button
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Download Complete'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Chat has been saved as PDF:'),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    filePath,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await OpenFile.open(filePath);
+                },
+                child: const Text('Open PDF'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
