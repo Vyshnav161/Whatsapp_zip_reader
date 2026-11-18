@@ -13,6 +13,10 @@
         android:label="WZipChat"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- AdMob app ID for WZipChat -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9792550446464845~4976528803"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -41,13 +41,13 @@ class WhatsAppTheme {
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
       ),
-      tabBarTheme: const TabBarTheme(
+      tabBarTheme: const TabBarThemeData(
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white70,
         indicatorColor: Colors.white,
         indicatorSize: TabBarIndicatorSize.label,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

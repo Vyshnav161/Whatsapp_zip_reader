@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/ads_provider.dart';
 import '../providers/whatsapp_zip_provider.dart';
+import '../widgets/banner_ad_widget.dart';
 import '../utils/theme_utils.dart';
 import 'main_screen.dart';
 
@@ -54,9 +56,12 @@ class _EntryScreenState extends State<EntryScreen> {
       if (success) {
         // Navigate to main screen
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-          );
+          final navigator = Navigator.of(context);
+          context.read<AdsProvider>().showInterstitial(() {
+            navigator.pushReplacement(
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+            );
+          });
         }
       } else if (provider.errorMessage != null) {
         setState(() {
@@ -79,6 +84,9 @@ class _EntryScreenState extends State<EntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const SafeArea(
+        child: Center(heightFactor: 1, child: BannerAdWidget()),
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -174,6 +182,34 @@ class _EntryScreenState extends State<EntryScreen> {
                 ),
               ],
               
+              // Remove ads purchase
+              Consumer<AdsProvider>(
+                builder: (context, ads, child) {
+                  if (ads.adsRemoved) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: Column(
+                      children: [
+                        if (ads.canBuy)
+                          TextButton.icon(
+                            onPressed: ads.purchasePending ? null : ads.buyRemoveAds,
+                            icon: const Icon(Icons.block),
+                            label: Text('Remove ads (${ads.price})'),
+                          ),
+                        TextButton(
+                          onPressed: ads.purchasePending ? null : ads.restore,
+                          child: const Text('Restore purchase'),
+                        ),
+                        if (ads.message != null)
+                          Text(
+                            ads.message!,
+                            style: const TextStyle(color: WhatsAppTheme.secondaryTextColor),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               // Permission status from provider
               Consumer<WhatsappZipProvider>(
                 builder: (context, provider, child) {
